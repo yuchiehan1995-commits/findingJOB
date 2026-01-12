@@ -17,7 +17,9 @@ import {
   BrainCircuit,
   Settings,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  ExternalLink,
+  Link as LinkIcon
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -107,8 +109,8 @@ const App: React.FC = () => {
   ]);
 
   const [jobs, setJobs] = useState<Job[]>([
-    { id: 'j1', company: 'NVIDIA', title: 'Frontend Engineer', status: 'Interviewing', date: '2024-01-12' },
-    { id: 'j2', company: 'Google', title: 'UX Developer', status: 'Applied', date: '2024-01-10' },
+    { id: 'j1', company: 'NVIDIA', title: 'Frontend Engineer', status: 'Interviewing', date: '2024-01-12', url: 'https://nvidia.com/careers' },
+    { id: 'j2', company: 'Google', title: 'UX Developer', status: 'Applied', date: '2024-01-10', url: 'https://google.com/about/careers' },
     { id: 'j3', company: 'Stripe', title: 'Fullstack Dev', status: 'ToApply', date: '2024-01-13' },
     { id: 'j4', company: 'Apple', title: 'Product Manager', status: 'Rejected', date: '2024-01-05' }
   ]);
@@ -139,8 +141,6 @@ const App: React.FC = () => {
       const result = await analyzeJD(jdInput);
       setAnalysisResult(result);
       
-      // Auto-add extracted skills if they don't exist
-      // Use explicit type casting for 'To Do' to satisfy SkillStatus type
       const newSkills: Skill[] = result.skills.map(name => ({
         id: Math.random().toString(36).substr(2, 9),
         name,
@@ -173,14 +173,15 @@ const App: React.FC = () => {
   const addJob = () => {
     const company = prompt("Company Name?");
     const title = prompt("Job Title?");
+    const url = prompt("Job Posting URL? (Optional)") || undefined;
     if (company && title) {
-      // Explicitly cast 'ToApply' as JobStatus
       setJobs([{ 
         id: Date.now().toString(), 
         company, 
         title, 
         status: 'ToApply' as JobStatus, 
-        date: new Date().toISOString().split('T')[0] 
+        date: new Date().toISOString().split('T')[0],
+        url
       }, ...jobs]);
     }
   };
@@ -405,7 +406,6 @@ const App: React.FC = () => {
               <button 
                 onClick={() => {
                   const name = prompt("Skill name?");
-                  // Explicitly cast 'To Do' as SkillStatus
                   if(name) setSkills([...skills, { id: Date.now().toString(), name, status: 'To Do' as SkillStatus, source: 'Manual' }]);
                 }}
                 className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition flex items-center gap-2 shadow-lg"
@@ -474,7 +474,20 @@ const App: React.FC = () => {
                       </div>
                       <div>
                         <h4 className="font-bold text-slate-700 leading-none mb-1">{job.company}</h4>
-                        <p className="text-xs text-slate-400 font-medium">{job.title}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-slate-400 font-medium">{job.title}</p>
+                          {job.url && (
+                            <a 
+                              href={job.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:text-blue-700 transition"
+                              title="View Posting"
+                            >
+                              <LinkIcon size={12} />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -513,10 +526,24 @@ const App: React.FC = () => {
                       </div>
                       <div>
                         <h4 className="font-black text-xl text-slate-900">{job.company}</h4>
-                        <div className="flex items-center gap-3 text-sm text-slate-500 font-medium mt-1">
-                          <span>{job.title}</span>
-                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                          <span>{job.date}</span>
+                        <div className="flex flex-col gap-1 mt-1">
+                          <div className="flex items-center gap-3 text-sm text-slate-500 font-medium">
+                            <span>{job.title}</span>
+                            <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                            <span>{job.date}</span>
+                          </div>
+                          {job.url && (
+                            <a 
+                              href={job.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-xs text-blue-500 font-bold hover:text-blue-700 transition w-fit group/link"
+                            >
+                              <LinkIcon size={12} />
+                              <span>View Application Link</span>
+                              <ExternalLink size={10} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                            </a>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -545,7 +572,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Persistent Mobile Navigation (optional improvement) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-4 flex justify-between items-center z-50">
         <button onClick={() => setActiveTab('dashboard')} className={`p-2 ${activeTab === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}><TrendingUp size={24} /></button>
         <button onClick={() => setActiveTab('planner')} className={`p-2 ${activeTab === 'planner' ? 'text-blue-600' : 'text-slate-400'}`}><Calendar size={24} /></button>

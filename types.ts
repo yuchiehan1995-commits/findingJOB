@@ -16,6 +16,7 @@ export interface Job {
   title: string;
   status: JobStatus;
   date: string;
+  url?: string;
 }
 
 export type ScheduleType = 'daily' | 'weekly';

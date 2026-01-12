@@ -1,50 +1,263 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Career Sprint Assistant</title>
+    <title>Smart Career Sprint Assistant</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Babel for JSX/TS parsing in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in {
-            animation: fadeIn 0.4s ease-out forwards;
-        }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3"
-  }
-}
-</script>
+
+    <!-- Import Map for ESM Modules -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.263.1",
+        "recharts": "https://esm.sh/recharts@2.10.3",
+        "@google/genai": "https://esm.sh/@google/genai@1.35.0"
+      }
+    }
+    </script>
 <link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
-</body>
-</html>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useMemo, useEffect } from 'react';
+        import ReactDOM from 'react-dom';
+        import { 
+          Target, Calendar, TrendingUp, BookOpen, Briefcase, Plus, Trash2, Clock, 
+          Edit3, Settings, ChevronRight, ListTodo, History, BrainCircuit, 
+          ExternalLink, Link as LinkIcon 
+        } from 'lucide-react';
+        import { 
+          BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell 
+        } from 'recharts';
+        import { GoogleGenAI, Type } from "@google/genai";
+
+        // --- 1. Gemini Service Logic ---
+        const ai = new GoogleGenAI({ apiKey: window.process?.env?.API_KEY || "" });
+
+        const analyzeJD = async (jdText) => {
+          const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Analyze this Job Description and extract key skills and a quick strategy: \n\n${jdText}`,
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  skills: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "List of 3-5 core technical skills or domain knowledge required."
+                  },
+                  softSkills: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "List of 2-3 essential soft skills."
+                  },
+                  strategy: {
+                    type: Type.STRING,
+                    description: "A one-sentence high-level strategy for applying to this specific role."
+                  }
+                },
+                required: ["skills", "softSkills", "strategy"]
+              },
+              systemInstruction: "You are an expert career consultant and technical recruiter. Your goal is to help candidates identify the most critical keywords and skills to emphasize in their resume and interview."
+            }
+          });
+          try {
+            return JSON.parse(response.text || "{}");
+          } catch (e) {
+            console.error("Parse error", e);
+            return { skills: [], softSkills: [], strategy: "無法產生分析。" };
+          }
+        };
+
+        // --- 2. Components ---
+        const Sidebar = ({ activeTab, setActiveTab, progress }) => {
+          const menuItems = [
+            { id: 'dashboard', icon: TrendingUp, label: '儀表板' },
+            { id: 'planner', icon: Calendar, label: '衝刺計畫' },
+            { id: 'skills', icon: BookOpen, label: '技能庫' },
+            { id: 'jobs', icon: Briefcase, label: '投遞追蹤' }
+          ];
+
+          return (
+            <nav className="fixed left-0 top-0 h-full w-64 bg-slate-900 text-white p-6 hidden md:flex flex-col border-r border-slate-800 z-50">
+              <div className="flex items-center gap-3 mb-10 text-blue-400">
+                <div className="bg-blue-600/20 p-2 rounded-lg"><Target size={24} /></div>
+                <span className="text-xl font-bold tracking-tight">Sprint Career</span>
+              </div>
+              <div className="space-y-1.5 flex-1">
+                {menuItems.map(item => (
+                  <button key={item.id} onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${activeTab === item.id ? 'bg-blue-600 shadow-lg text-white' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}>
+                    <item.icon size={20} />
+                    <span className="font-medium">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-auto">
+                <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
+                  <p className="text-[10px] text-slate-500 mb-3 font-bold uppercase flex justify-between">
+                    進度 <span>{Math.round(progress)}%</span>
+                  </p>
+                  <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-blue-500 h-full transition-all duration-1000" style={{ width: `${Math.min(progress, 100)}%` }}></div>
+                  </div>
+                </div>
+              </div>
+            </nav>
+          );
+        };
+
+        // --- 3. Main App Component ---
+        const App = () => {
+          const [activeTab, setActiveTab] = useState('dashboard');
+          const [dashboardName, setDashboardName] = useState('我的求職衝刺');
+          const [isEditingName, setIsEditingName] = useState(false);
+          const [isAnalyzing, setIsAnalyzing] = useState(false);
+          const [jdInput, setJdInput] = useState('');
+          const [analysisResult, setAnalysisResult] = useState(null);
+
+          const goals = { applications: 30, interviews: 10, offers: 2 };
+
+          const [skills, setSkills] = useState([
+            { id: '1', name: 'PowerBI', status: 'Learning', source: 'JD 分析' },
+            { id: '2', name: 'React', status: 'Mastered', source: '自學' }
+          ]);
+
+          const [jobs, setJobs] = useState([
+            { id: 'j1', company: 'NVIDIA', title: '前端工程師', status: 'Interviewing', date: '2024-01-12', url: 'https://nvidia.com/careers' },
+            { id: 'j2', company: 'Google', title: 'UX 開發者', status: 'Applied', date: '2024-01-10', url: 'https://google.com/careers' }
+          ]);
+
+          const stats = useMemo(() => {
+            const applied = jobs.filter(j => j.status !== 'ToApply').length;
+            const interviews = jobs.filter(j => ['Interviewing', 'Offered', 'Rejected'].includes(j.status)).length;
+            const offers = jobs.filter(j => j.status === 'Offered').length;
+            return { applied, interviews, offers };
+          }, [jobs]);
+
+          const chartData = [
+            { name: '已投遞', value: stats.applied, goal: goals.applications, color: '#3b82f6' },
+            { name: '面試', value: stats.interviews, goal: goals.interviews, color: '#10b981' },
+            { name: '錄取', value: stats.offers, goal: goals.offers, color: '#f59e0b' },
+          ];
+
+          const handleJDAnalysis = async () => {
+            if (!jdInput.trim()) return;
+            setIsAnalyzing(true);
+            try {
+              const result = await analyzeJD(jdInput);
+              setAnalysisResult(result);
+              const newSkills = result.skills.map(name => ({
+                id: Math.random().toString(36).substr(2, 9),
+                name,
+                status: 'To Do',
+                source: 'AI 分析'
+              })).filter(ns => !skills.some(os => os.name.toLowerCase() === ns.name.toLowerCase()));
+              if (newSkills.length > 0) setSkills(prev => [...prev, ...newSkills]);
+            } catch (error) {
+              console.error(error);
+              alert("分析失敗，請檢查 API 金鑰。");
+            } finally {
+              setIsAnalyzing(false);
+              setJdInput('');
+            }
+          };
+
+          const progressPercentage = (stats.applied / goals.applications) * 100;
+
+          return (
+            <div className="min-h-screen flex bg-slate-50 overflow-x-hidden">
+              <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} progress={progressPercentage} />
+              <main className="flex-1 md:ml-64 p-4 md:p-10 max-w-6xl mx-auto w-full transition-all">
+                
+                <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      {isEditingName ? (
+                        <input autoFocus className="text-3xl font-black text-slate-900 bg-transparent border-b-4 border-blue-500 outline-none"
+                          value={dashboardName} onChange={(e) => setDashboardName(e.target.value)} onBlur={() => setIsEditingName(false)} />
+                      ) : (
+                        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditingName(true)}>
+                          <h1 className="text-3xl font-black text-slate-900 tracking-tight">{dashboardName}</h1>
+                          <Edit3 size={20} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-slate-500 mt-1 flex items-center gap-2 font-medium">
+                      <Clock size={16} /> 距離衝刺結束還有 2 週
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-widest">衝刺截止日期</span>
+                      <span className="text-xl font-black text-slate-900">5月 31日</span>
+                    </div>
+                    <button className="p-2 bg-slate-100 rounded-lg text-slate-600"><Settings size={18} /></button>
+                  </div>
+                </header>
+
+                {activeTab === 'dashboard' && (
+                  <div className="space-y-8 animate-fade-in">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {chartData.map((item) => (
+                        <div key={item.name} className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 relative transition-all hover:shadow-md">
+                          <p className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">{item.name}</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-black text-slate-900">{item.value}</span>
+                            <span className="text-slate-300 font-bold">/ {item.goal}</span>
+                          </div>
+                          <div className="mt-4 w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div className="bg-blue-500 h-full" style={{ width: `${Math.min((item.value / item.goal) * 100, 100)}%`, backgroundColor: item.color }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                      <div className="lg:col-span-3 bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-200"><BrainCircuit size={24} /></div>
+                          <div>
+                            <h2 className="text-xl font-bold text-slate-900">AI 職缺分析</h2>
+                            <p className="text-sm text-slate-400">貼上 JD 立即提取關鍵技能與建議</p>
+                          </div>
+                        </div>
+                        <textarea value={jdInput} onChange={(e) => setJdInput(e.target.value)}
+                          className="w-full h-40 p-5 bg-slate-50 border border-slate-200 rounded-2xl outline-none transition-all resize-none mb-4"
+                          placeholder="在此貼上職缺描述 (Job Description)..."></textarea>
+                        <button onClick={handleJDAnalysis} disabled={isAnalyzing || !jdInput.trim()}
+                          className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition disabled:opacity-50">
+                          {isAnalyzing ? "正在分析中..." : "分析並同步技能庫"}
+                        </button>
+                        {analysisResult && (
+                          <div className="mt-6 p-6 bg-blue-50 rounded-2xl border border-blue-100 animate-fade-in">
+                            <h3 className="text-blue-700 font-bold mb-2">💡 戰略建議</h3>
+                            <p className="text-blue-800/80 italic text-sm mb-4 leading-relaxed">"{analysisResult.strategy}"</p>
+                            <div className="flex flex-wrap gap-2">
+                              {analysisResult.skills.map(skill => (
+                                <span key={skill} className="bg-white px-3 py-1 rounded-full text-xs font-bold
